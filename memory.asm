@@ -3,7 +3,6 @@
 
 section .bss
 
-; ---- Layer activations ----
 global z1, h1, z2, h2, z3, h3, o
 
 z1 resd 256             ; pre-activation hidden layer 1
