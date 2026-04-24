@@ -6,6 +6,7 @@ section .text
 ; rcx = number of elements
 ; returns: rax = index of maximum value
 argmax:
+    push rbx
     xor rax, rax        ; rax = best index
     xor rbx, rbx        ; rbx = loop index
     movss xmm1, [rdi]   ; xmm1 = current max value
@@ -15,9 +16,10 @@ argmax:
     ucomiss xmm0, xmm1
     jbe .skip_update
     movss xmm1, xmm0
-    mov rax, rbx        ; save new max index
+    mov rax, rbx        
 .skip_update:
     inc rbx
     cmp rbx, rcx
     jl .loop
+    pop rbx
     ret
