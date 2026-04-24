@@ -1,4 +1,4 @@
-# MNIST Neural Network In x86-64 Assembly
+# MNIST Neural Network in x86-64 Assembly
 
 This repository is a handwritten digit classifier built almost entirely in x86-64 assembly.
 
