@@ -19,8 +19,10 @@ section .text
 layer_forward:
     push r15                  ; save r15 to use for relu flag
     push r14                  ; save r14 to use for z-buffer pointer
-    mov r15, [rsp+24]         ; get use_relu flag (offset: +8 for r14, +8 for r15, +8 for ret addr)
-    mov r14, [rsp+32]         ; get z-buffer pointer
+    push r13
+    push r12
+    mov r15, [rsp+40]         ; get use_relu flag after saving r12-r15
+    mov r14, [rsp+48]         ; get z-buffer pointer
 
     xor r10, r10              ; neuron index
 .layer_loop:
@@ -78,6 +80,8 @@ layer_forward:
     inc r10
     cmp r10, rcx
     jl .layer_loop
+    pop r12
+    pop r13
     pop r14
     pop r15
     ret
