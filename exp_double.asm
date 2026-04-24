@@ -1,5 +1,5 @@
 global exp_double
-extern exp    ; C math library function
+extern exp    ; C math library fn
 
 section .text
 ; input: xmm0
@@ -8,9 +8,9 @@ exp_double:
     sub rsp, 8
 
     push rbx
-    push rsi      ; save output pointer
-    push rdi      ; save input pointer
-    push rcx      ; save length
+    push rsi      ;  output pntr
+    push rdi      ;  input pntr
+    push rcx      ;  length
 
     call exp
 
