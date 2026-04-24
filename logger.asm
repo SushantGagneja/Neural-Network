@@ -1,5 +1,5 @@
 ; logger.asm — Output formatting for training progress
-; Provides: print_loss, print_epoch, print_accuracy, print_val_accuracy
+; Provides: print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header
 
 section .data
     newline db 10
@@ -10,13 +10,14 @@ section .data
     percent_text db "%", 10, 0
     loss_prefix  db "  Loss: ", 0
     done_text    db "Training complete.", 10, 0
+    summary_text db 10, "Run summary", 10, 0
 
 section .bss
     buffer resb 32
     epoch_buffer resb 16
 
 section .text
-global print_loss, print_epoch, print_accuracy, print_val_accuracy
+global print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header
 
 ; ============================================================
 ; print_epoch(r14 = epoch number)
@@ -65,8 +66,8 @@ print_loss:
     push rbp
     mov rbp, rsp
 
-    movsd [rsp-8], xmm0
     sub rsp, 8
+    movsd [rsp], xmm0
 
     ; Print "  Loss: "
     push rax
@@ -145,8 +146,8 @@ print_val_accuracy:
     push rbp
     mov rbp, rsp
 
-    movsd [rsp-8], xmm0
     sub rsp, 8
+    movsd [rsp], xmm0
 
     ; Print "  Val Acc: "
     mov rax, 1
@@ -189,8 +190,8 @@ print_loss_value:
     push rbp
     mov rbp, rsp
 
-    movsd [rsp-8], xmm0
     sub rsp, 8
+    movsd [rsp], xmm0
 
     mov rdi, buffer
     movsd xmm0, [rsp]
@@ -215,11 +216,24 @@ print_loss_value:
     ret
 
 ; ============================================================
+; print_summary_header()
+; ============================================================
+print_summary_header:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, summary_text
+    mov rdx, 13
+    syscall
+    ret
+
+; ============================================================
+; ============================================================
 ; Convert double in xmm0 to string at rdi
 ; ============================================================
 double_to_string:
     push rbp
     mov rbp, rsp
+    push rbx
 
     ; Check if negative
     pxor xmm1, xmm1
@@ -263,6 +277,7 @@ double_to_string:
     mov byte [rdi], 0
 
     pop rax
+    pop rbx
     pop rbp
     ret
 
