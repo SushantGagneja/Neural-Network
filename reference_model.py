@@ -1,181 +1,151 @@
-#!/usr/bin/env python3
-
 import numpy as np
-import struct
 import os
 
-def load_images(path):
-    with open(path, 'rb') as f:
-        magic, n, rows, cols = struct.unpack('>IIII', f.read(16))
+def load_images(filename):
+    with open(filename, 'rb') as f:
+        f.read(16)
         data = np.frombuffer(f.read(), dtype=np.uint8)
-        return data.reshape(n, rows * cols).astype(np.float32) / 255.0
+    return data.astype(np.float32) / 255.0
 
-def load_labels(path):
-    with open(path, 'rb') as f:
-        magic, n = struct.unpack('>II', f.read(8))
-        return np.frombuffer(f.read(), dtype=np.uint8)
+def load_labels(filename):
+    with open(filename, 'rb') as f:
+        f.read(8)
+        data = np.frombuffer(f.read(), dtype=np.uint8)
+    return data
 
-#Activation fns 
-def relu(x):
-    return np.maximum(0, x)
+def get_one_hot(targets, nb_classes):
+    res = np.eye(nb_classes)[np.array(targets).reshape(-1)]
+    return res.reshape(list(targets.shape)+[nb_classes])
 
-def relu_backward(z, grad):
-    """Gate gradient by pre-activation z (correct way)"""
-    return grad * (z > 0).astype(np.float32)
+data_dir = "dataset"
+train_images = load_images(os.path.join(data_dir, "train-images.idx3-ubyte")).reshape(-1, 784)
+train_labels = load_labels(os.path.join(data_dir, "train-labels.idx1-ubyte"))
+test_images = load_images(os.path.join(data_dir, "t10k-images.idx3-ubyte")).reshape(-1, 784)
+test_labels = load_labels(os.path.join(data_dir, "t10k-labels.idx1-ubyte"))
 
-def softmax(x):
-    e = np.exp(x - np.max(x))
-    return e / e.sum()
-
-#He initialization
-def he_init(fan_in, fan_out):
-    scale = np.sqrt(2.0 / fan_in)
-    return np.random.uniform(-scale, scale, (fan_out, fan_in)).astype(np.float32)
-
-#Network
-class Network:
+class MLP:
     def __init__(self):
-        self.W1 = he_init(784, 256)
-        self.b1 = np.zeros(256, dtype=np.float32)
-        self.W2 = he_init(256, 128)
-        self.b2 = np.zeros(128, dtype=np.float32)
-        self.W3 = he_init(128, 64)
-        self.b3 = np.zeros(64, dtype=np.float32)
-        self.W4 = he_init(64, 10)
-        self.b4 = np.zeros(10, dtype=np.float32)
+        # Use uniform distribution to exactly match the simplified Assembly PRNG
+        self.W1 = np.random.uniform(-0.0505, 0.0505, (784, 256))
+        self.b1 = np.zeros(256)
+        
+        self.W2 = np.random.uniform(-0.0884, 0.0884, (256, 128))
+        self.b2 = np.zeros(128)
+        
+        self.W3 = np.random.uniform(-0.1250, 0.1250, (128, 64))
+        self.b3 = np.zeros(64)
+        
+        self.W4 = np.random.uniform(-0.1768, 0.1768, (64, 10))
+        self.b4 = np.zeros(10)
 
     def forward(self, x):
         self.x = x
-        self.z1 = self.W1 @ x + self.b1
-        self.h1 = relu(self.z1)
-        self.z2 = self.W2 @ self.h1 + self.b2
-        self.h2 = relu(self.z2)
-        self.z3 = self.W3 @ self.h2 + self.b3
-        self.h3 = relu(self.z3)
-        self.z4 = self.W4 @ self.h3 + self.b4
-        self.o = softmax(self.z4)
-        return self.o
+        self.z1 = np.dot(x, self.W1) + self.b1
+        self.h1 = np.maximum(0, self.z1)
+        
+        self.z2 = np.dot(self.h1, self.W2) + self.b2
+        self.h2 = np.maximum(0, self.z2)
+        
+        self.z3 = np.dot(self.h2, self.W3) + self.b3
+        self.h3 = np.maximum(0, self.z3)
+        
+        self.o = np.dot(self.h3, self.W4) + self.b4
+        
+        # Softmax
+        exp_o = np.exp(self.o - np.max(self.o, axis=1, keepdims=True))
+        self.p = exp_o / np.sum(exp_o, axis=1, keepdims=True)
+        return self.p
 
-    def backward(self, label):
-        #output grad
-        grad_o = self.o.copy()
-        grad_o[label] -= 1.0
+    def backward(self, y_true):
+        batch_size = y_true.shape[0]
+        
+        grad_o = self.p - y_true
+        
+        self.dW4 = np.dot(self.h3.T, grad_o)
+        self.db4 = np.sum(grad_o, axis=0)
+        
+        grad_h3 = np.dot(grad_o, self.W4.T)
+        grad_z3 = grad_h3 * (self.z3 > 0)
+        
+        self.dW3 = np.dot(self.h2.T, grad_z3)
+        self.db3 = np.sum(grad_z3, axis=0)
+        
+        grad_h2 = np.dot(grad_z3, self.W3.T)
+        grad_z2 = grad_h2 * (self.z2 > 0)
+        
+        self.dW2 = np.dot(self.h1.T, grad_z2)
+        self.db2 = np.sum(grad_z2, axis=0)
+        
+        grad_h1 = np.dot(grad_z2, self.W2.T)
+        grad_z1 = grad_h1 * (self.z1 > 0)
+        
+        self.dW1 = np.dot(self.x.T, grad_z1)
+        self.db1 = np.sum(grad_z1, axis=0)
 
-        #L4
-        dW4 = np.outer(grad_o, self.h3)
-        db4 = grad_o.copy()
-        grad_h3 = self.W4.T @ grad_o
+    def update(self, lr, batch_size):
+        # Match assembly exactly (avg grad scale)
+        self.W1 -= lr * (self.dW1 / batch_size)
+        self.b1 -= lr * (self.db1 / batch_size)
+        
+        self.W2 -= lr * (self.dW2 / batch_size)
+        self.b2 -= lr * (self.db2 / batch_size)
+        
+        self.W3 -= lr * (self.dW3 / batch_size)
+        self.b3 -= lr * (self.db3 / batch_size)
+        
+        self.W4 -= lr * (self.dW4 / batch_size)
+        self.b4 -= lr * (self.db4 / batch_size)
 
-        #L3
-        grad_z3 = relu_backward(self.z3, grad_h3)
-        dW3 = np.outer(grad_z3, self.h2)
-        db3 = grad_z3.copy()
-        grad_h2 = self.W3.T @ grad_z3
+mlp = MLP()
+epochs = 25
+batch_size = 64
+lr = 0.005
+decay = 0.97
+epoch_losses = []
+epoch_val_accs = []
 
-        # L2
-        grad_z2 = relu_backward(self.z2, grad_h2)
-        dW2 = np.outer(grad_z2, self.h1)
-        db2 = grad_z2.copy()
-        grad_h1 = self.W2.T @ grad_z2
+print(f"Architecture: 784 -> 256 -> 128 -> 64 -> 10")
+print(f"LR: {lr}, Batch: {batch_size}, Epochs: {epochs}, Decay: {decay}\n")
 
-        #L1
-        grad_z1 = relu_backward(self.z1, grad_h1)
-        dW1 = np.outer(grad_z1, self.x)
-        db1 = grad_z1.copy()
+for epoch in range(epochs):
+    loss_sum = 0
+    # No shuffling to match assembly!
+    num_batches = len(train_images) // batch_size
+    
+    for i in range(num_batches):
+        start = i * batch_size
+        end = start + batch_size
+        x_batch = train_images[start:end]
+        y_batch = train_labels[start:end]
+        y_batch_onehot = get_one_hot(y_batch, 10)
+        
+        p = mlp.forward(x_batch)
+        
+        batch_loss = -np.sum(y_batch_onehot * np.log(p + 1e-9)) / batch_size
+        loss_sum += batch_loss
+        
+        mlp.backward(y_batch_onehot)
+        mlp.update(lr, batch_size)
+    
+    lr *= decay
+    
+    # Validation uses last 1000 test samples
+    val_x = test_images[9000:10000]
+    val_y = test_labels[9000:10000]
+    val_p = mlp.forward(val_x)
+    val_preds = np.argmax(val_p, axis=1)
+    val_acc = np.mean(val_preds == val_y)
 
-        return dW1, db1, dW2, db2, dW3, db3, dW4, db4
+    epoch_loss = loss_sum / num_batches
+    epoch_losses.append(epoch_loss)
+    epoch_val_accs.append(val_acc)
+    print(f"Epoch {epoch+1}/{epochs}  Loss: {epoch_loss:.4f}  Val Acc: {val_acc*100:.2f}%")
 
-def main():
-    #Paths
-    data_dir = "dataset"
-    train_images = load_images(os.path.join(data_dir, "train-images.idx3-ubyte"))
-    train_labels = load_labels(os.path.join(data_dir, "train-labels.idx1-ubyte"))
-    test_images = load_images(os.path.join(data_dir, "t10k-images.idx3-ubyte"))
-    test_labels = load_labels(os.path.join(data_dir, "t10k-labels.idx1-ubyte"))
+test_p = mlp.forward(test_images)
+test_preds = np.argmax(test_p, axis=1)
+test_acc = np.mean(test_preds == test_labels)
 
-    net = Network()
-    lr = 0.005
-    batch_size = 64
-    epochs = 25
-
-    print(f"Architecture: 784 → 256 → 128 → 64 → 10")
-    print(f"LR: {lr}, Batch: {batch_size}, Epochs: {epochs}, Decay: 0.97")
-    print()
-
-    #Forward pass for debugging
-    o = net.forward(train_images[0])
-    print(f"Sample 0 forward pass:")
-    print(f"  h1[0:5] = {net.h1[:5]}")
-    print(f"  h2[0:5] = {net.h2[:5]}")
-    print(f"  h3[0:5] = {net.h3[:5]}")
-    print(f"  output  = {o}")
-    print(f"  label   = {train_labels[0]}")
-    print()
-
-    #Training
-    total_samples = (60000 // batch_size) * batch_size
-    batches = total_samples // batch_size
-
-    for epoch in range(epochs):
-        epoch_loss = 0
-        batch_count = 0
-
-        for b in range(batches):
-            #Accumulate grads
-            dW1_acc = np.zeros_like(net.W1)
-            db1_acc = np.zeros_like(net.b1)
-            dW2_acc = np.zeros_like(net.W2)
-            db2_acc = np.zeros_like(net.b2)
-            dW3_acc = np.zeros_like(net.W3)
-            db3_acc = np.zeros_like(net.b3)
-            dW4_acc = np.zeros_like(net.W4)
-            db4_acc = np.zeros_like(net.b4)
-            batch_loss = 0
-
-            for s in range(batch_size):
-                idx = b * batch_size + s
-                o = net.forward(train_images[idx])
-                loss = -np.log(o[train_labels[idx]] + 1e-10)
-                batch_loss += loss
-
-                dW1, db1, dW2, db2, dW3, db3, dW4, db4 = net.backward(train_labels[idx])
-                dW1_acc += dW1; db1_acc += db1
-                dW2_acc += dW2; db2_acc += db2
-                dW3_acc += dW3; db3_acc += db3
-                dW4_acc += dW4; db4_acc += db4
-
-            #Update wts
-            net.W1 -= lr * dW1_acc / batch_size
-            net.b1 -= lr * db1_acc / batch_size
-            net.W2 -= lr * dW2_acc / batch_size
-            net.b2 -= lr * db2_acc / batch_size
-            net.W3 -= lr * dW3_acc / batch_size
-            net.b3 -= lr * db3_acc / batch_size
-            net.W4 -= lr * dW4_acc / batch_size
-            net.b4 -= lr * db4_acc / batch_size
-
-            epoch_loss += batch_loss / batch_size
-            batch_count += 1
-
-        # LR decay (gentler curve)
-        lr *= 0.97
-
-        #Validation 
-        correct = 0
-        for i in range(9000, 10000):
-            o = net.forward(test_images[i])
-            if np.argmax(o) == test_labels[i]:
-                correct += 1
-
-        print(f"Epoch {epoch+1}/25  Loss: {epoch_loss/batch_count:.4f}  Val Acc: {correct/10:.2f}%  LR: {lr:.6f}")
-
-    #Final test accuracy
-    correct = 0
-    for i in range(10000):
-        o = net.forward(test_images[i])
-        if np.argmax(o) == test_labels[i]:
-            correct += 1
-    print(f"\nTest accuracy: {correct/100:.2f}%")
-
-if __name__ == "__main__":
-    main()
+print("\nRun summary")
+for i, (loss, val_acc) in enumerate(zip(epoch_losses, epoch_val_accs), start=1):
+    print(f"Epoch {i}/{epochs}  Loss: {loss:.4f}  Val Acc: {val_acc*100:.2f}%")
+print(f"Test accuracy: {test_acc:.4f}")
