@@ -7,6 +7,7 @@ section .text
 ; rdx = bias
 ; xmm0 = result
 dot_product:
+    push rbx
     xorps xmm0, xmm0        ; accumulator
     xor rax, rax            ; index
 
@@ -49,4 +50,5 @@ dot_product:
     addss xmm0, xmm2
     movss xmm1, [rdx]
     addss xmm0, xmm1
+    pop rbx
     ret
