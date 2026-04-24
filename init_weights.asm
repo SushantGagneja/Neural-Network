@@ -2,9 +2,9 @@ global init_weights
 extern W1, W2, W3, W4
 
 section .data
-    scale_w1  dd  0.0884          ; sqrt(2/256)
-    scale_w2  dd  0.1250          ; sqrt(2/128)
-    scale_w3  dd  0.1768          ; sqrt(2/64)
+    scale_w1  dd  0.0505          ; sqrt(2/784)
+    scale_w2  dd  0.0884          ; sqrt(2/256)
+    scale_w3  dd  0.1250          ; sqrt(2/128)
     scale_w4  dd  0.1768          ; sqrt(2/64)
     two_inv   dd  4.6566129e-10   ; 1 / (2^31)
     
