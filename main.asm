@@ -1,6 +1,6 @@
 ; main.asm — Entry point for MNIST 4-layer neural network
 ; Architecture: 784 → 256 → 128 → 64 → 10
-; Training: batch_size=64, epochs=15, lr=0.005 with 0.95 decay
+; Training: batch_size=64, epochs=25, lr=0.005 with 0.97 decay
 
 global _start
 extern load_mnist_image, load_mnist_label, fetch_data, fetch_labels
@@ -11,7 +11,7 @@ extern z1, h1, z2, h2, z3, h3, o
 extern dW1, dbias1, dW2, dbias2, dW3, dbias3, dW4, dbias4
 extern grad_h1, grad_h2, grad_h3, grad_o
 extern accumulate_gradients, update_weights, clear_gradients
-extern print_loss, print_epoch, print_accuracy, print_val_accuracy
+extern print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header
 extern argmax
 extern init_weights
 extern learning_rate, decay_factor
@@ -26,6 +26,8 @@ VAL_COUNT equ 1000              ; validate on 1000 samples
 
 section .bss
 losses resd BATCH_SIZE          ; store per-sample losses
+epoch_val_history resq EPOCHS
+final_test_accuracy resq 1
 
 section .text
 _start:
@@ -280,6 +282,10 @@ _start:
     cvtsi2ss xmm1, rax
     divss xmm0, xmm1
     cvtss2sd xmm0, xmm0
+    mov rax, EPOCHS
+    sub rax, [rsp]
+    lea r10, [rel epoch_val_history]
+    movsd [r10 + rax*8], xmm0
     call print_val_accuracy
 
     ; Reload training data for next epoch
@@ -395,6 +401,24 @@ _start:
     divss xmm0, xmm1
 
     cvtss2sd xmm0, xmm0
+    movsd [rel final_test_accuracy], xmm0
+    call print_summary_header
+
+    xor r13, r13
+.summary_loop:
+    cmp r13, EPOCHS
+    jge .summary_done
+    mov r14, r13
+    inc r14
+    call print_epoch
+    lea r10, [rel epoch_val_history]
+    movsd xmm0, [r10 + r13*8]
+    call print_val_accuracy
+    inc r13
+    jmp .summary_loop
+
+.summary_done:
+    movsd xmm0, [rel final_test_accuracy]
     call print_accuracy
 
     ; exit
