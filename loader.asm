@@ -17,21 +17,20 @@ fetch_data:
     mov r15, [rsp+16]         ; get train-test flag from stack (offset +8 because we pushed r15)
 
     push rbp
+    push rbx
     push r12
     push r13
     mov rbp, rsp
-
-    mov r12, rsi
 
     cmp r15, 1
     je .load_test_data
     ; load train data
     mov rdi, img_file ; address of train filename
-    mov rcx, 60000
+    mov r13, 60000
     jmp .rest_load_data
 .load_test_data:
     mov rdi, img_test_file  ; address of test filename
-    mov rcx, 10000
+    mov r13, 10000
 .rest_load_data:
 
     mov rax, 2        ; open images file
@@ -58,7 +57,7 @@ fetch_data:
     mov rdi, rbx
     lea rsi, [rel img]
     mov rdx, 784
-    imul rdx, rcx     ; rdx = 784 * (60000 or 10000)
+    imul rdx, r13     ; rdx = 784 * (60000 or 10000)
     syscall
 
     ; close
@@ -68,6 +67,7 @@ fetch_data:
     
     pop r13
     pop r12
+    pop rbx
     pop rbp
     pop r15
     ret
@@ -77,21 +77,20 @@ fetch_labels:
     mov r15, [rsp+16]         ; get train-test flag from stack (offset +8 because we pushed r15)
 
     push rbp
+    push rbx
+    push r12
     mov rbp, rsp
-    
-    ; Save the index
-    mov r12, rsi
-    
+
     ; open labels file
     cmp r15, 1
     je .load_test_label
     ; load train label
     mov rdi, label_file ; address of train label filename
-    mov rcx, 60000
+    mov r12, 60000
     jmp .rest_load_label
 .load_test_label:
     mov rdi, label_test_file  ; address of test label filename
-    mov rcx, 10000
+    mov r12, 10000
 .rest_load_label:
 
     mov rax, 2
@@ -110,7 +109,7 @@ fetch_labels:
     mov rax, 0
     mov rdi, rbx
     lea rsi, [rel labels]
-    mov rdx, rcx
+    mov rdx, r12
     syscall
 
     ; close
@@ -118,6 +117,8 @@ fetch_labels:
     mov rdi, rbx
     syscall
     
+    pop r12
+    pop rbx
     pop rbp
     pop r15
     ret
