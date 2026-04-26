@@ -1,4 +1,4 @@
-; dataset.asm MNIST image and label buffers(renamed from mnist_data.asm)
+; dataset.asm — MNIST image and label buffers (renamed from mnist_data.asm)
 
 global img
 global label, labels
