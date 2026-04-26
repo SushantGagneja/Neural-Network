@@ -16,7 +16,7 @@ argmax:
     ucomiss xmm0, xmm1
     jbe .skip_update
     movss xmm1, xmm0
-    mov rax, rbx        
+    mov rax, rbx        ; save new max index
 .skip_update:
     inc rbx
     cmp rbx, rcx
