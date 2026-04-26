@@ -1,5 +1,7 @@
 ; logger.asm — Output formatting for training progress
-; Provides: print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header
+; Provides: print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header, print_optimizer_name
+
+extern optimizer_name
 
 section .data
     newline db 10
@@ -11,13 +13,14 @@ section .data
     loss_prefix  db "  Loss: ", 0
     done_text    db "Training complete.", 10, 0
     summary_text db 10, "Run summary", 10, 0
+    optimizer_text db "Optimizer: ", 0
 
 section .bss
     buffer resb 32
     epoch_buffer resb 16
 
 section .text
-global print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header
+global print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header, print_optimizer_name
 
 ; ============================================================
 ; print_epoch(r14 = epoch number)
@@ -227,6 +230,31 @@ print_summary_header:
     ret
 
 ; ============================================================
+; print_optimizer_name()
+; ============================================================
+print_optimizer_name:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, optimizer_text
+    mov rdx, 11
+    syscall
+
+    lea rsi, [rel optimizer_name]
+    call string_length
+    mov rdx, rax
+    lea rsi, [rel optimizer_name]
+    mov rax, 1
+    mov rdi, 1
+    syscall
+
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+    ret
+
+; ============================================================
 ; ============================================================
 ; Convert double in xmm0 to string at rdi
 ; ============================================================
@@ -320,9 +348,8 @@ int_to_string:
     pop rbx
     ret
 
-; ============================================================
 ; Get length of null-terminated string in rsi → rax
-; ============================================================
+
 string_length:
     xor rax, rax
 .count:
