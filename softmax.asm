@@ -29,12 +29,27 @@ softmax:
     movss xmm0, [rdi + rbx*4]
     subss xmm0, xmm7      ; xmm0 = input[i] - max
 
+    ; Save caller-saved registers before C exp() call
+    sub rsp, 32
+    movsd [rsp],    xmm6    ; save sum accumulator
+    movsd [rsp+8],  xmm7    ; save max value
+    mov [rsp+16], rdi        ; save input pointer
+    mov [rsp+24], rsi        ; save output pointer
+
     cvtss2sd xmm0, xmm0    ; float -> double
-    call exp_double       ; xmm0 = exp(input[i] - max)
+    call exp_double         ; xmm0 = exp(input[i] - max)
+
+    ; Restore caller-saved registers
+    mov rsi, [rsp+24]
+    mov rdi, [rsp+16]
+    movsd xmm7, [rsp+8]
+    movsd xmm6, [rsp]
+    add rsp, 32
+
     cvtsd2ss xmm0, xmm0    ; double -> float
 
     movss [rsi + rbx*4], xmm0
-    addss xmm6, xmm0      ; accumulate sum
+    addss xmm6, xmm0      ; accumulate sum (now correct!)
     inc rbx
     cmp rbx, r12
     jl .loop_exp
