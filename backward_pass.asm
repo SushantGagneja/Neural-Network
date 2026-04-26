@@ -19,31 +19,33 @@ accumulate_gradients:
     push rbp
     mov rbp, rsp
 
-    ; ==================== BACKPROPAGATION ====================
+    ; BACKPROPAGATION
 
-    ; ---- Output layer gradient (softmax + cross entropy) ----
+    ; Output layer gradient (softmax + cross entropy)
     lea rdi, [rel o]
     lea rsi, [rel label]
     lea rdx, [rel grad_o]
     mov rcx, 10
     call softmax_cross_entropy_backward
 
-    ; ---- Layer 4 gradients (W4, b4) ----
+    ; Layer 4 gradients (W4, b4) 
     ; dW4 += grad_o ⊗ h3  (outer product)
     lea rdi, [rel grad_o]       ; gradient from output (size 10)
     lea rsi, [rel h3]           ; input to layer 4 (size 64)
     lea rdx, [rel dW4]
-    mov rcx, 10                 ; output size (grad_o size)
-    mov r9, 64                  ; input size (h3 size)
+    mov r9, 10                  ; A=grad_o has 10 elements
+    mov rcx, 64                 ; B=h3 has 64 elements
     call outer_product_add
 
     ; dbias4 += grad_o
+    lea r10, [rel grad_o]
+    lea r11, [rel dbias4]
     mov rcx, 10
     xor rax, rax
 .accumulate_db4_loop:
-    movss xmm0, [grad_o + rax*4]
-    addss xmm0, [dbias4 + rax*4]
-    movss [dbias4 + rax*4], xmm0
+    movss xmm0, [r10 + rax*4]
+    addss xmm0, [r11 + rax*4]
+    movss [r11 + rax*4], xmm0
     inc rax
     cmp rax, rcx
     jl .accumulate_db4_loop
@@ -56,7 +58,7 @@ accumulate_gradients:
     mov r9, 64                  ; W4 columns
     call matrix_vector_multiply
 
-    ; ---- Layer 3 gradients with ReLU ----
+    ;  Layer 3 gradients with ReLU 
     ; Apply ReLU backward: gate grad_h3 by z3 (pre-activation, NOT h3)
     lea rdi, [rel z3]           ; pre-activation z3
     lea rsi, [rel grad_h3]     ; gradient from above
@@ -67,17 +69,19 @@ accumulate_gradients:
     lea rdi, [rel grad_h3]     ; gradient (grad_z3, size 64)
     lea rsi, [rel h2]           ; input to layer 3 (size 128)
     lea rdx, [rel dW3]
-    mov rcx, 64                 ; output size
-    mov r9, 128                 ; input size
+    mov r9, 64                  ; A=grad_z3 has 64 elements
+    mov rcx, 128                ; B=h2 has 128 elements
     call outer_product_add
 
     ; dbias3 += grad_z3
+    lea r10, [rel grad_h3]
+    lea r11, [rel dbias3]
     mov rcx, 64
     xor rax, rax
 .accumulate_db3_loop:
-    movss xmm0, [grad_h3 + rax*4]
-    addss xmm0, [dbias3 + rax*4]
-    movss [dbias3 + rax*4], xmm0
+    movss xmm0, [r10 + rax*4]
+    addss xmm0, [r11 + rax*4]
+    movss [r11 + rax*4], xmm0
     inc rax
     cmp rax, rcx
     jl .accumulate_db3_loop
@@ -90,7 +94,7 @@ accumulate_gradients:
     mov r9, 128                 ; W3 columns
     call matrix_vector_multiply
 
-    ; ---- Layer 2 gradients with ReLU ----
+    ;  Layer 2 gradients with ReLU 
     lea rdi, [rel z2]           ; pre-activation z2
     lea rsi, [rel grad_h2]
     mov rcx, 128
@@ -100,17 +104,19 @@ accumulate_gradients:
     lea rdi, [rel grad_h2]     ; gradient (grad_z2, size 128)
     lea rsi, [rel h1]           ; input to layer 2 (size 256)
     lea rdx, [rel dW2]
-    mov rcx, 128                ; output size
-    mov r9, 256                 ; input size
+    mov r9, 128                 ; A=grad_z2 has 128 elements
+    mov rcx, 256                ; B=h1 has 256 elements
     call outer_product_add
 
     ; dbias2 += grad_z2
+    lea r10, [rel grad_h2]
+    lea r11, [rel dbias2]
     mov rcx, 128
     xor rax, rax
 .accumulate_db2_loop:
-    movss xmm0, [grad_h2 + rax*4]
-    addss xmm0, [dbias2 + rax*4]
-    movss [dbias2 + rax*4], xmm0
+    movss xmm0, [r10 + rax*4]
+    addss xmm0, [r11 + rax*4]
+    movss [r11 + rax*4], xmm0
     inc rax
     cmp rax, rcx
     jl .accumulate_db2_loop
@@ -123,7 +129,7 @@ accumulate_gradients:
     mov r9, 256                 ; W2 columns
     call matrix_vector_multiply
 
-    ; ---- Layer 1 gradients with ReLU ----
+    ; Layer 1 gradients with ReLU 
     lea rdi, [rel z1]           ; pre-activation z1
     lea rsi, [rel grad_h1]
     mov rcx, 256
@@ -138,12 +144,14 @@ accumulate_gradients:
     call outer_product_add
 
     ; dbias1 += grad_z1
+    lea r10, [rel grad_h1]
+    lea r11, [rel dbias1]
     mov rcx, 256
     xor rax, rax
 .accumulate_db1_loop:
-    movss xmm0, [grad_h1 + rax*4]
-    addss xmm0, [dbias1 + rax*4]
-    movss [dbias1 + rax*4], xmm0
+    movss xmm0, [r10 + rax*4]
+    addss xmm0, [r11 + rax*4]
+    movss [r11 + rax*4], xmm0
     inc rax
     cmp rax, rcx
     jl .accumulate_db1_loop
