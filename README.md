@@ -1,6 +1,6 @@
 # Neural Network in x86-64 Assembly
 
-A fully hand-written, from-scratch implementation of a multilayer perceptron trained on the MNIST handwritten digit dataset. Every component, from forward pass to backpropagation, is implemented directly in x86-64 NASM assembly with no ML libraries and links against libm solely for the exp function; all other functionality uses Linux syscalls directly.
+A fully hand-written, from-scratch implementation of a multilayer perceptron trained on the MNIST handwritten digit dataset. Every component, from forward pass to backpropagation, is implemented directly in x86-64 NASM assembly, linking against libm solely for the exp function. No ML libraries are used. All other functionality uses Linux syscalls directly.
 
 ## Architecture
 
@@ -148,9 +148,8 @@ Gradients are accumulated across the batch in `accumulate_gradients`. The total 
 ## Known limitations
 
 - No dropout or batch normalization.
-- Training is strictly CPU-bound. While it utilizes SSE SIMD vectorization for hot paths, it does not currently implement AVX-512 extensions for maximum wide-vector throughput.
+- Training is strictly CPU-bound. While it utilizes 128-bit SSE SIMD vectorization for hot paths, it does not currently extend to AVX2 256-bit wide-vector instructions for further throughput gains.
 
 ## License
-
 
 MIT
