@@ -11,7 +11,7 @@ extern z1, h1, z2, h2, z3, h3, o
 extern dW1, dbias1, dW2, dbias2, dW3, dbias3, dW4, dbias4
 extern grad_h1, grad_h2, grad_h3, grad_o
 extern accumulate_gradients, update_weights, clear_gradients
-extern print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header
+extern print_loss, print_epoch, print_accuracy, print_val_accuracy, print_summary_header, print_optimizer_name
 extern argmax
 extern init_weights
 extern learning_rate, decay_factor
@@ -28,11 +28,64 @@ section .bss
 losses resd BATCH_SIZE          ; store per-sample losses
 epoch_val_history resq EPOCHS
 final_test_accuracy resq 1
+shuffle_indices resd TOTAL_SAMPLES
+
+section .data
+shuffle_seed dd 1337
 
 section .text
+init_shuffle_indices:
+    xor rax, rax
+    lea r8, [rel shuffle_indices]
+.init_loop:
+    mov [r8 + rax*4], eax
+    inc rax
+    cmp rax, TOTAL_SAMPLES
+    jl .init_loop
+    ret
+
+shuffle_next_u32:
+    mov eax, [rel shuffle_seed]
+    imul eax, eax, 1103515245
+    add eax, 12345
+    and eax, 0x7fffffff
+    mov [rel shuffle_seed], eax
+    ret
+
+shuffle_training_indices:
+    push rbp
+    mov rbp, rsp
+    push rbx
+
+    mov rcx, TOTAL_SAMPLES - 1
+    lea r8, [rel shuffle_indices]
+.shuffle_loop:
+    cmp rcx, 0
+    jle .shuffle_done
+
+    call shuffle_next_u32
+    xor edx, edx
+    mov ebx, ecx
+    inc ebx
+    div ebx                    ; edx = random % (i + 1)
+
+    mov eax, [r8 + rcx*4]
+    xchg eax, [r8 + rdx*4]
+    mov [r8 + rcx*4], eax
+
+    dec rcx
+    jmp .shuffle_loop
+
+.shuffle_done:
+    pop rbx
+    pop rbp
+    ret
+
 _start:
     ; ---- Initialize weights with He initialization ----
     call init_weights
+    call init_shuffle_indices
+    call print_optimizer_name
 
     ; ---- Load training data ----
     mov r15, EPOCHS
@@ -46,6 +99,7 @@ _start:
     mov r14, EPOCHS + 1
     sub r14, r15
     call print_epoch
+    call shuffle_training_indices
     xor r14, r14                ; batch index = 0
 
 .batch_loop:
@@ -64,6 +118,8 @@ _start:
 
     mov rax, r13
     add rax, rbx                ; global sample index
+    lea r12, [rel shuffle_indices]
+    mov eax, [r12 + rax*4]
     call load_mnist_image
 
     pop r13
@@ -73,6 +129,8 @@ _start:
 
     mov rax, r13
     add rax, rbx                ; global sample index
+    lea r12, [rel shuffle_indices]
+    mov eax, [r12 + rax*4]
     call load_mnist_label
 
     ; ============== FORWARD PASS (4 layers) ==============
@@ -403,6 +461,7 @@ _start:
     cvtss2sd xmm0, xmm0
     movsd [rel final_test_accuracy], xmm0
     call print_summary_header
+    call print_optimizer_name
 
     xor r13, r13
 .summary_loop:
