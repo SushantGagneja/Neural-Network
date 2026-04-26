@@ -1,14 +1,27 @@
 #!/bin/bash
 set -e
+OPTIMIZER="${1:-sgd}"
+
+case "$OPTIMIZER" in
+  sgd) OPT_FLAG=0 ;;
+  momentum) OPT_FLAG=1 ;;
+  adam) OPT_FLAG=2 ;;
+  *)
+    echo "Usage: ./build.sh [sgd|momentum|adam]"
+    exit 1
+    ;;
+esac
+
 mkdir -p obj
 
 echo "Assembling..."
+echo "Optimizer mode: $OPTIMIZER"
 
 # Core files
 nasm -f elf64 -g -F dwarf main.asm          -o obj/main.o
 nasm -f elf64 -g -F dwarf forward_pass.asm   -o obj/forward_pass.o
 nasm -f elf64 -g -F dwarf backward_pass.asm  -o obj/backward_pass.o
-nasm -f elf64 -g -F dwarf optimizer.asm      -o obj/optimizer.o
+nasm -f elf64 -g -F dwarf -DOPTIMIZER_MODE=$OPT_FLAG optimizer.asm -o obj/optimizer.o
 
 # Data layout
 nasm -f elf64 -g -F dwarf memory.asm         -o obj/memory.o
