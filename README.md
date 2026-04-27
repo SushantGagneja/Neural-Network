@@ -84,8 +84,6 @@ docker run --rm -it --platform linux/amd64 -v "$PWD":/app -w /app neural-network
 
 ## Dataset
 
-Download the MNIST dataset in IDX binary format and place the four files under `dataset/`:
-
 ```text
 dataset/
 ├── train-images.idx3-ubyte
@@ -93,8 +91,6 @@ dataset/
 ├── t10k-images.idx3-ubyte
 └── t10k-labels.idx1-ubyte
 ```
-
-The official source is [yann.lecun.com/exdb/mnist](http://yann.lecun.com/exdb/mnist/) or the mirror at [ossci-datasets.s3.amazonaws.com](https://ossci-datasets.s3.amazonaws.com/mnist/).
 
 ## Build and run
 
